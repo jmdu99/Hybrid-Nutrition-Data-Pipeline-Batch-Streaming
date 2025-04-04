@@ -1,10 +1,8 @@
 import os
 import time
 import requests
-import uuid
 from datetime import datetime
 from kafka import KafkaConsumer
-from kafka.errors import NoBrokersAvailable
 from cassandra.cluster import Cluster
 
 KAFKA_HOST = os.environ.get("KAFKA_HOST", "kafka")
