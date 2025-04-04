@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Install Poetry
+        run: pip install poetry
+
+      - name: Poetry Install
+        run: poetry install
+
+      - name: Install formatters and linters
+        run: |
+          poetry run pip install black isort flake8
+
+      - name: Run Black (auto format)
+        run: poetry run black .
+
+      - name: Run Isort (auto sort imports)
+        run: poetry run isort .
+
+      - name: Run Flake8 (linting only)
+        run: poetry run flake8 .

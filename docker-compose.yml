@@ -1,0 +1,171 @@
+volumes:
+  cassandra_data:
+  clickhouse_data:
+  dagster_data:
+  superset_data:
+  postgres_data:
+  
+
+services:
+  zookeeper:
+    image: bitnami/zookeeper:latest
+    container_name: zookeeper
+    environment:
+      - ZOO_ENABLE_AUTH=no
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    ports:
+      - "${ZOOKEEPER_PORT:-2181}:2181"
+    networks:
+      - data_net
+
+  postgres:
+    image: postgres:14
+    container_name: postgres
+    environment:
+      POSTGRES_USER: superset
+      POSTGRES_PASSWORD: superset
+      POSTGRES_DB: superset
+    ports:
+      - "5432:5432"
+    networks:
+      - data_net
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  kafka:
+    image: bitnami/kafka:3.3.2
+    container_name: kafka
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_LISTENERS=PLAINTEXT://:9092
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - ALLOW_PLAINTEXT_LISTENER=yes
+    depends_on:
+      - zookeeper
+    ports:
+      - "${KAFKA_PORT:-9092}:9092"
+    networks:
+      - data_net
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cassandra:
+    image: cassandra:latest
+    container_name: cassandra
+    networks:
+      - data_net
+    ports:
+      - "9042:9042"
+    environment:
+      - CASSANDRA_CLUSTER_NAME=DataCluster
+    volumes:
+      - cassandra_data:/var/lib/cassandra
+
+  clickhouse:
+    image: yandex/clickhouse-server:latest
+    container_name: clickhouse
+    networks:
+      - data_net
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+
+  dagster:
+    build:
+      context: .
+      dockerfile: ./dagster_project/Dockerfile
+    container_name: dagster
+    depends_on:
+      - cassandra
+      - clickhouse
+    networks:
+      - data_net
+    ports:
+      - "${DAGSTER_PORT:-3000}:3000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - API_NINJAS_KEY=${API_NINJAS_KEY}
+      - DAGSTER_HOME=/dagster_home
+    volumes:
+      - dagster_data:/dagster_home
+  
+  dagster-daemon:
+    build:
+      context: .
+      dockerfile: ./dagster_project/Dockerfile
+    container_name: dagster-daemon
+    depends_on:
+      - dagster
+    networks:
+      - data_net
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - API_NINJAS_KEY=${API_NINJAS_KEY}
+      - DAGSTER_HOME=/dagster_home
+    volumes:
+      - dagster_data:/dagster_home
+
+    command: ["/venv/bin/poetry", "run", "dagster-daemon", "run", "-f", "/app/dagster_code/pipeline.py", "-a", "defs"]
+
+  superset:
+    build:
+      context: .
+      dockerfile: ./superset/Dockerfile
+    container_name: superset
+    depends_on:
+      - clickhouse
+      - postgres
+    networks:
+      - data_net
+    ports:
+      - "${SUPERSET_PORT:-8088}:8088"
+    environment:
+      - SUPERSET_SECRET_KEY=some_secret_key
+      - GUNICORN_CMD_ARGS=--timeout 1000 --workers 5 --worker-class gevent
+      - FLASK_APP=superset.app:create_app()
+    volumes:
+      - superset_data:/app/superset_home/data
+
+  producer:
+    build:
+      context: .
+      dockerfile: ./producer/Dockerfile
+    container_name: producer
+    depends_on:
+      - kafka
+    networks:
+      - data_net
+    environment:
+      - KAFKA_HOST=kafka
+      - KAFKA_PORT=9092
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+
+  consumer:
+    build:
+      context: .
+      dockerfile: ./consumer/Dockerfile
+    container_name: consumer
+    depends_on:
+      - kafka
+      - cassandra
+    networks:
+      - data_net
+    environment:
+      - KAFKA_HOST=kafka
+      - KAFKA_PORT=9092
+      - CASSANDRA_HOST=cassandra
+      - CASSANDRA_PORT=9042
+      - CASSANDRA_KEYSPACE=nutrition_ks
+      - CASSANDRA_TABLE=items_raw
+      - API_NINJAS_KEY=${API_NINJAS_KEY}
+
+networks:
+  data_net:
+    driver: bridge
+    
