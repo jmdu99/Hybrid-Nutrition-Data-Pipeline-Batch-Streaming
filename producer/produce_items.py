@@ -60,4 +60,4 @@ if __name__ == "__main__":
         else:
             print(f"Item '{item}' already produced multiple times, skipping.")
 
-        time.sleep(5)  # Produce cada 5 segundos
+        time.sleep(5)  # Produce every 5 seconds
