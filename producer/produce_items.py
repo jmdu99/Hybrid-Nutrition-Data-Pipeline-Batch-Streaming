@@ -11,6 +11,7 @@ TOPIC = "foods_topic"
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 openai.api_key = OPENAI_API_KEY
 
+
 def generate_random_food_item():
     """Calls OpenAI to generate a short food item name."""
     try:
@@ -25,18 +26,20 @@ def generate_random_food_item():
         print(f"OpenAI error: {e}")
         return None
 
+
 def create_kafka_producer():
     while True:
         try:
             producer = KafkaProducer(
                 bootstrap_servers=f"{KAFKA_HOST}:{KAFKA_PORT}",
-                value_serializer=lambda v: v.encode('utf-8')
+                value_serializer=lambda v: v.encode("utf-8"),
             )
             print("Connected to Kafka broker.")
             return producer
         except NoBrokersAvailable:
             print("Kafka broker not available. Waiting 5 seconds to retry...")
             time.sleep(5)
+
 
 if __name__ == "__main__":
     producer = create_kafka_producer()
