@@ -15,7 +15,7 @@ The system operates with two integrated layers:
 
 ### ⏱️ Batch Pipeline with Dagster
 - **Extract**: Pulls raw food records from Cassandra.
-- **Enrich**: Uses OpenAI to generate descriptive content (e.g., preparation tips, food context).
+- **Enrich**: Uses OpenAI to add descriptions, preparation advice, and health tips.
 - **Load**: Writes the enriched data into **ClickHouse** for analytics.
 
 ## 🗺️ Architecture Diagram
